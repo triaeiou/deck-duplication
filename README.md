@@ -1,5 +1,8 @@
 # Deck duplication
 Anki addon to clone existing deck (and it's subdecks) in place (media references retained, i.e. no separate copy is made of any media files).
+
+![Screenshots](https://github.com/TRIAEIOU/Deck-duplication/blob/main/Screenshots/collage.png?raw=true)
+
 - The duplicated deck will contain all notes with at least one card in the source deck (it is possible to assign different cards from the same note to different decks, the addon does not take this into consideration).
 - Tags are not cloned.
 - Right click the source deck in the browser (not available from the main Anki window) and select `Duplicate deck`.
