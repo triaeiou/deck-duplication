@@ -4,7 +4,7 @@ from anki.decks import DeckId
 from aqt import mw, gui_hooks
 from aqt.browser.sidebar import SidebarItemType
 from aqt.qt import QAction
-from aqt.utils import tooltip
+from aqt.utils import tooltip, askUser
 from uuid import uuid4
 from aqt.operations import CollectionOp
 
@@ -26,8 +26,8 @@ def duplicate_deck(parent, refresh, sid, recurse = True, dname = None):
                 for key, val in snote.items():
                     dnote[key] = val
                 change = col.add_note(dnote, did)
-                note_cnt +=1
                 #changes.append(change)
+                note_cnt +=1
             return changes
         
         changes = collection.OpChanges()
@@ -57,9 +57,10 @@ def duplicate_deck(parent, refresh, sid, recurse = True, dname = None):
 
     note_cnt = 0
 
-    bgop = CollectionOp(parent=parent, op=lambda col: _duplicate_deck(col, sid, sname, dname, recurse))
-    bgop.run_in_background()
-    bgop.success(success=_success)
+    if askUser(f'Duplicate "{sname}" to "{dname}"?', parent, title=DUPLICATE_DECK_TITLE):
+        bgop = CollectionOp(parent=parent, op=lambda col: _duplicate_deck(col, sid, sname, dname, recurse))
+        bgop.run_in_background()
+        bgop.success(success=_success)
 
 #########################################################################
 # Delete identical notes within supplied directory,
@@ -68,6 +69,7 @@ def duplicate_deck(parent, refresh, sid, recurse = True, dname = None):
 def delete_clones(parent, refresh, did, recurse = True, keep = 'oldest'):
     def _delete_clones(col, did, recurse, keep):
         nonlocal note_cnt
+        nonlocal dnotes
         changes = collection.OpChanges()
         decks = ' ,'.join([str(dids) for dids in col.decks.deck_and_child_ids(did)]) if recurse else str(did)
         query = f'''
@@ -77,7 +79,6 @@ def delete_clones(parent, refresh, did, recurse = True, keep = 'oldest'):
         ORDER BY notes.flds ASC, notes.mod ASC
         '''
         cnotes = []
-        dnotes = []
         for nid, flds in col.db.all(query):
             if len(cnotes) and flds != cnotes[-1][1]:
                 dnotes += [n for n, f in (cnotes[:-1] if keep == 'newest' else cnotes[1:])]
@@ -87,14 +88,16 @@ def delete_clones(parent, refresh, did, recurse = True, keep = 'oldest'):
         # Last note
         dnotes += [n for n, f in (cnotes[:-1] if keep == 'newest' else cnotes[1:])]
         note_cnt = len(dnotes)
-        changes = col.remove_notes(dnotes)
         return changes
 
     def _success(changes):
         refresh()
-        tooltip(msg=f'Deleted {note_cnt} duplicate notes.', parent=parent)
+        if note_cnt and askUser(f'Delete {note_cnt} note clones?', parent, title=DUPLICATE_DECK_TITLE):
+            changes = mw.col.remove_notes(dnotes)
+            tooltip(msg=f'Deleted {note_cnt} duplicate notes.', parent=parent)
 
     note_cnt = 0
+    dnotes = []
     bgop = CollectionOp(parent=parent, op=lambda col: _delete_clones(col, did, recurse, keep))
     bgop.run_in_background()
     bgop.success(success=_success)
